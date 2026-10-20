@@ -26,6 +26,7 @@ import logging
 import re
 import socket
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -188,20 +189,25 @@ class SearXNGClient:
 
         url = f"{self.base_url}/search"
         payload = None
-        try:
-            response = httpx.get(
-                url,
-                params=params,
-                timeout=min(self.timeout, 5.0),
-                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
-                follow_redirects=True,
-            )
-            if response.status_code == 200:
-                payload = response.json()
-            elif response.status_code == 403:
-                logger.warning("SearXNG returned 403 (JSON disabled). Trying direct legal search.")
-        except Exception as exc:
-            logger.info("SearXNG at %s not available (%s). Using direct free search backend.", self.base_url, exc)
+        now = time.time()
+        if not (hasattr(self, "_searxng_down_until") and now < self._searxng_down_until):
+            try:
+                response = httpx.get(
+                    url,
+                    params=params,
+                    timeout=min(self.timeout, 1.5),
+                    headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+                    follow_redirects=True,
+                )
+                if response.status_code == 200:
+                    payload = response.json()
+                    self._searxng_down_until = 0.0
+                elif response.status_code == 403:
+                    logger.warning("SearXNG returned 403 (JSON disabled). Trying direct legal search.")
+                    self._searxng_down_until = now + 60.0
+            except Exception as exc:
+                self._searxng_down_until = now + 60.0
+                logger.info("SearXNG at %s not available (%s). Using direct free search backend.", self.base_url, exc)
 
         if payload and isinstance(payload, dict) and payload.get("results"):
             results: List[SearXNGResult] = []
@@ -531,10 +537,10 @@ class PageFetcher:
     """Fetches pages with httpx, enforcing SSRF, size and timeout limits."""
 
     def __init__(self, timeout: Optional[float] = None, max_bytes: Optional[int] = None) -> None:
-        self.timeout = timeout if timeout is not None else settings.WEB_SEARCH_FETCH_TIMEOUT
+        self.timeout = min(timeout if timeout is not None else settings.WEB_SEARCH_FETCH_TIMEOUT, 6.0)
         self.max_bytes = max_bytes if max_bytes is not None else settings.WEB_SEARCH_MAX_BYTES
         self._client = httpx.Client(
-            timeout=httpx.Timeout(self.timeout, connect=min(self.timeout, 10.0)),
+            timeout=httpx.Timeout(self.timeout, connect=min(self.timeout, 3.5)),
             follow_redirects=False,
             headers={
                 "User-Agent": USER_AGENT,
