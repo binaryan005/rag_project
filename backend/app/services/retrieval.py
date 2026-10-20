@@ -4,6 +4,13 @@ from app.services.embedder import embedder
 from rank_bm25 import BM25Okapi
 import re
 
+def tokenize_text(text: str):
+    """Basic lowercase and alphanumeric tokenization for BM25.
+
+    Shared with the web-search ranker so both pipelines score text the same way.
+    """
+    return [word.lower() for word in re.findall(r'\b\w+\b', text)]
+
 class RetrievalService:
     def hybrid_search(self, db: Session, document_id: str, query: str, top_k: int = 5):
         """
@@ -90,6 +97,6 @@ class RetrievalService:
         
     def _tokenize(self, text: str):
         # Basic lowercase and alphanumeric tokenization for BM25
-        return [word.lower() for word in re.findall(r'\b\w+\b', text)]
+        return tokenize_text(text)
 
 retrieval_service = RetrievalService()

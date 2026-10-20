@@ -50,4 +50,41 @@ ADDITIONAL CONTEXT (Surrounding Text):
             print(f"Error calling Gemini API: {e}")
             return exact_evidence or "Error generating response from LLM."
 
+    def generate_web_legal_answer(self, query: str, grounded_context: str) -> str:
+        """
+        Synthesizes an answer strictly from retrieved web sources.
+
+        Returns an empty string when the LLM is not configured, so the caller
+        can fall back to the grounded context instead of inventing content.
+        """
+        if not self.model or not (grounded_context or "").strip():
+            return ""
+
+        system_prompt = f"""You are a legal research assistant answering questions about Indian law.
+
+You are given passages extracted verbatim from verified web sources (official statute and
+judgment publishers first, then clearly-labelled secondary commentary).
+
+Rules:
+- Use ONLY the passages provided. Never add facts, cases, sections or citations that are not in them.
+- Cite the passage number in square brackets, e.g. [1] or [2][3], right after the claim it supports.
+- If the passages do not answer the question, say exactly what is missing.
+- Prefer official sources; note when a statement comes from secondary commentary.
+- Do not mention retrieval, embeddings, reranking, JSON or internal processing.
+- Be concise: short paragraphs or bullet points.
+
+QUESTION:
+{query}
+
+VERIFIED SOURCES:
+{grounded_context}
+"""
+
+        try:
+            response = self.model.generate_content(system_prompt)
+            return response.text or ""
+        except Exception as e:
+            print(f"Error calling Gemini API for web search: {e}")
+            return ""
+
 llm_service = LLMService()

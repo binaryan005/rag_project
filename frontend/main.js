@@ -176,9 +176,13 @@ if (queryForm) {
     const query = document.getElementById("query-input").value.trim();
     if (!query) return;
 
-    setStatus("query-status", "Querying…", "loading");
+    setStatus("query-status", "Querying document…", "loading");
     setLoading("query-btn", "query-spinner", true);
     document.getElementById("query-result").innerHTML = "";
+    const docWebResult = document.getElementById("doc-websearch-result");
+    if (docWebResult) docWebResult.innerHTML = "";
+
+    const includeWeb = document.getElementById("include-web-search-toggle")?.checked;
 
     try {
       const res = await fetch(`${API_BASE}/documents/${selectedDocId}/query`, {
@@ -191,12 +195,212 @@ if (queryForm) {
 
       document.getElementById("query-result").innerHTML = renderAnswerCard(data, query);
       setStatus("query-status", "✅ Answer received", "success");
+
+      if (includeWeb) {
+        if (docWebResult) {
+          docWebResult.innerHTML = `<p class="status-msg loading">🔍 Searching live legal web sources (India Code, Courts, BNS 2023)…</p>`;
+          try {
+            const webRes = await fetch(`${API_BASE}/web-search`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query }),
+            });
+            const webData = await webRes.json();
+            if (webRes.ok) {
+              docWebResult.innerHTML = `<h3 style="margin: 1.25rem 0 0.5rem; font-size: 1rem; color: var(--accent-secondary); display: flex; align-items: center; gap: 0.5rem;"><span>🌐</span> Verified External Legal Sources (Web)</h3>` + renderWebSearchResult(webData);
+            } else {
+              docWebResult.innerHTML = renderSearxngError(webData.detail || "Search backend unavailable");
+            }
+          } catch (webErr) {
+            docWebResult.innerHTML = `<p class="status-msg error">❌ Web search failed: ${escapeHtml(webErr.message)}</p>`;
+          }
+        }
+      } else if (data.confidence < 0.15) {
+        if (docWebResult) {
+          docWebResult.innerHTML = `
+            <div style="margin-top: 1rem; padding: 0.9rem 1.1rem; background: rgba(108, 92, 231, 0.08); border: 1px dashed var(--border-color); border-radius: var(--border-radius-sm); text-align: center;">
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.6rem;">
+                Looking for statutory provisions or case law? This contract had no direct match.
+              </p>
+              <button type="button" class="btn btn-primary btn-sm" onclick="triggerWebSearchFromQuery('${escapeHtml(query).replace(/'/g, "\\'")}')">
+                🌐 Search Live Web for "${escapeHtml(query.length > 55 ? query.slice(0, 52) + '…' : query)}"
+              </button>
+            </div>
+          `;
+        }
+      }
     } catch (err) {
       setStatus("query-status", "❌ " + err.message, "error");
     } finally {
       setLoading("query-btn", "query-spinner", false);
     }
   });
+}
+
+// ── 5. Live Legal Web Search ─────────────────────────────
+const websearchForm = document.getElementById("websearch-form");
+if (websearchForm) {
+  websearchForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const query = document.getElementById("websearch-input").value.trim();
+    if (!query) return;
+    executeWebSearch(query);
+  });
+}
+
+// Quick Suggestion Chips
+document.querySelectorAll(".quick-chips .chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    const q = chip.getAttribute("data-query");
+    if (!q) return;
+    const input = document.getElementById("websearch-input");
+    if (input) input.value = q;
+    executeWebSearch(q);
+  });
+});
+
+function triggerWebSearchFromQuery(q) {
+  const input = document.getElementById("websearch-input");
+  if (input) {
+    input.value = q;
+    input.scrollIntoView({ behavior: "smooth" });
+  }
+  executeWebSearch(q);
+}
+
+async function executeWebSearch(query) {
+  setStatus("websearch-status", "Searching verified legal sources… (India Code, Supreme Court, BNS 2023)", "loading");
+  setLoading("websearch-btn", "websearch-spinner", true);
+  const container = document.getElementById("websearch-result");
+  if (container) container.innerHTML = "";
+
+  try {
+    const res = await fetch(`${API_BASE}/web-search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      if (res.status === 503) {
+        if (container) container.innerHTML = renderSearxngError(data.detail);
+        setStatus("websearch-status", "⚠️ SearXNG backend configuration required", "warning");
+        return;
+      }
+      throw new Error(data.detail || JSON.stringify(data));
+    }
+
+    if (container) container.innerHTML = renderWebSearchResult(data);
+    const count = (data.citations || []).length;
+    setStatus("websearch-status", `✅ Found ${count} verified legal citation(s)`, "success");
+  } catch (err) {
+    setStatus("websearch-status", "❌ " + err.message, "error");
+    if (container) {
+      container.innerHTML = `<p class="status-msg error">Search failed: ${escapeHtml(err.message)}</p>`;
+    }
+  } finally {
+    setLoading("websearch-btn", "websearch-spinner", false);
+  }
+}
+
+function renderSearxngError(detail) {
+  return `
+    <div class="searxng-banner">
+      <h4>⚠️ Search Backend Setup Required</h4>
+      <p style="font-size:0.88rem; line-height: 1.5; margin-bottom: 0.5rem;">${escapeHtml(detail)}</p>
+      <p style="font-size:0.82rem; color: var(--text-secondary); margin-bottom: 0.3rem;">Run this command in Docker to launch SearXNG with JSON search enabled:</p>
+      <code>docker run -d -p 8080:8080 -v \${PWD}/searxng:/etc/searxng searxng/searxng</code>
+      <p style="font-size:0.8rem; color: var(--text-muted); margin-top: 0.3rem;">Ensure <code>search.formats: [html, json]</code> is set in <code>settings.yml</code>, or configure <code>SEARXNG_URL</code> in backend <code>.env</code>.</p>
+    </div>
+  `;
+}
+
+function renderWebSearchResult(data) {
+  const citations = data.citations || [];
+  const primary = data.primary_sources || citations.filter(c => c.source_tier === "primary" || c.is_official);
+  const secondary = data.secondary_sources || citations.filter(c => c.source_tier === "secondary");
+  const other = citations.filter(c => !primary.includes(c) && !secondary.includes(c));
+
+  let answerHtml = "";
+  if (data.answer && data.answer.trim()) {
+    answerHtml = `
+      <div class="web-answer-box">
+        <div class="web-answer-title">
+          <span>💡</span> Legal Analysis &amp; Statutory Synthesis
+        </div>
+        <p class="web-answer-text">${escapeHtml(data.answer)}</p>
+      </div>
+    `;
+  }
+
+  function renderCitationCard(c) {
+    const isPrimary = c.source_tier === "primary" || c.is_official;
+    return `
+      <div class="citation-card">
+        <div class="citation-card-header">
+          <a class="citation-title-link" href="${encodeURI(c.url)}" target="_blank" rel="noopener noreferrer">
+            ${escapeHtml(c.title || c.url)} ↗
+          </a>
+          <div class="badge-group">
+            ${isPrimary ? '<span class="badge-official">🏛️ Official / Primary</span>' : '<span class="badge-secondary">📚 Secondary Source</span>'}
+          </div>
+        </div>
+        <div class="citation-meta">
+          <span>${escapeHtml(c.source_name || c.domain)}</span>
+          &bull;
+          <a class="citation-url" href="${encodeURI(c.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(c.url)}</a>
+          ${c.jurisdiction ? `&bull; <span>${escapeHtml(c.jurisdiction)}</span>` : ""}
+        </div>
+        ${c.snippet ? `
+          <div class="citation-snippet">
+            "${escapeHtml(c.snippet)}"
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }
+
+  let primaryHtml = "";
+  if (primary.length > 0) {
+    primaryHtml = `
+      <div class="sources-group-title primary">
+        <span>🏛️</span> Official &amp; Primary Legal Sources (${primary.length})
+      </div>
+      <div class="sources-grid">
+        ${primary.map(renderCitationCard).join("")}
+      </div>
+    `;
+  }
+
+  let secondaryHtml = "";
+  const nonPrimaryList = [...secondary, ...other];
+  if (nonPrimaryList.length > 0) {
+    secondaryHtml = `
+      <div class="sources-group-title secondary">
+        <span>📚</span> Secondary Commentary &amp; Statutory Comparisons (${nonPrimaryList.length})
+      </div>
+      <div class="sources-grid">
+        ${nonPrimaryList.map(renderCitationCard).join("")}
+      </div>
+    `;
+  }
+
+  if (!citations.length && !data.answer) {
+    return `
+      <div class="no-clauses">
+        <span class="no-clauses-icon">📭</span>
+        <p>No verified legal sources found for this query.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="web-results-container">
+      ${answerHtml}
+      ${primaryHtml}
+      ${secondaryHtml}
+    </div>
+  `;
 }
 
 // ── Render helpers ────────────────────────────────────────
@@ -217,7 +421,7 @@ function renderAnswerCard(data, query) {
       <div class="answer-section">
         <div class="answer-label">
           <span class="answer-label-icon">💡</span>
-          Answer
+          Contract Answer
         </div>
         <p class="answer-text">${escapeHtml(data.answer)}</p>
       </div>
@@ -262,10 +466,10 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ── 5. Refresh button ────────────────────────────────────
+// ── 6. Refresh button ────────────────────────────────────
 document.getElementById("refresh-btn")?.addEventListener("click", loadDocuments);
 
-// ── 6. Drag & drop visual feedback ──────────────────────
+// ── 7. Drag & drop visual feedback ──────────────────────
 const dropZone = document.getElementById("drop-zone");
 if (dropZone) {
   ["dragenter", "dragover"].forEach(evt =>
