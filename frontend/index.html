@@ -1,126 +1,38 @@
-<!DOCTYPE html>
+
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Legal Document RAG Intelligence - Upload, analyze, and query legal contracts using AI" />
-  <title>Legal RAG Intelligence</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <div class="app-container">
-    <header class="header">
-      <div class="header-inner">
-        <div class="logo">
-          <span class="logo-icon">⚖️</span>
-          <h1>Legal RAG Intelligence</h1>
-        </div>
-        <p class="subtitle">Upload contracts · CUAD Analysis · Natural Language Queries</p>
-      </div>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
 
-    <main class="main-content">
-      <!-- Upload Section -->
-      <section class="card" id="upload-section">
-        <div class="card-header">
-          <span class="card-icon">📄</span>
-          <h2>Upload Document</h2>
-        </div>
-        <form id="upload-form">
-          <div class="file-drop-zone" id="drop-zone">
-            <span class="drop-icon">⬆️</span>
-            <p>Drag & drop a PDF or DOCX here, or click to browse</p>
-            <input type="file" id="file-input" accept=".pdf,.docx" required />
-          </div>
-          <button type="submit" class="btn btn-primary" id="upload-btn">
-            <span class="btn-text">Upload Document</span>
-            <span class="spinner hidden" id="upload-spinner"></span>
-          </button>
-        </form>
-        <p id="upload-status" class="status-msg"></p>
-      </section>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
 
-      <!-- Documents List -->
-      <section class="card" id="documents-section">
-        <div class="card-header">
-          <span class="card-icon">📚</span>
-          <h2>Documents</h2>
-          <button class="btn btn-ghost btn-sm" id="refresh-btn" title="Refresh list">🔄</button>
-        </div>
-        <div id="documents-list" class="doc-list">
-          <p class="empty-state">No documents uploaded yet.</p>
-        </div>
-      </section>
+    <meta
+      name="description"
+      content="Legal contract analysis platform for clause extraction, document analysis, and natural language querying."
+    />
 
-      <!-- Analysis Section -->
-      <section class="card hidden" id="analysis-section">
-        <div class="card-header">
-          <span class="card-icon">🔍</span>
-          <h2>CUAD Analysis</h2>
-        </div>
-        <p id="analysis-status" class="status-msg"></p>
-        <div id="analysis-result"></div>
-      </section>
+    <title>Legal RAG Intelligence</title>
 
-      <!-- Live Legal Web Search Section -->
-      <section class="card" id="websearch-section">
-        <div class="card-header">
-          <span class="card-icon">🌐</span>
-          <h2>Live Legal Web Search</h2>
-        </div>
-        <p class="section-desc">Search official Indian statutes, case law, and legal portals (India Code, Supreme Court, High Courts, eCourts) without hallucinations.</p>
-        <form id="websearch-form">
-          <div class="search-input-group">
-            <input type="text" id="websearch-input" placeholder="e.g., What is Section 420 of the Indian Penal Code, and what is its equivalent under the Bharatiya Nyaya Sanhita, 2023?" required />
-            <button type="submit" class="btn btn-primary" id="websearch-btn">
-              <span class="btn-text">Search Web</span>
-              <span class="spinner hidden" id="websearch-spinner"></span>
-            </button>
-          </div>
-          <div class="quick-chips">
-            <span class="chips-label">Quick Prompts:</span>
-            <button type="button" class="chip" data-query="What is Section 420 of the Indian Penal Code, and what is its equivalent under the Bharatiya Nyaya Sanhita, 2023?">Section 420 IPC vs BNS 2023</button>
-            <button type="button" class="chip" data-query="Bail provisions under Bharatiya Nagarik Suraksha Sanhita, 2023 vs CrPC">Bail: BNSS vs CrPC</button>
-            <button type="button" class="chip" data-query="Section 138 Negotiable Instruments Act dishonour of cheque">Section 138 NI Act</button>
-          </div>
-        </form>
-        <p id="websearch-status" class="status-msg"></p>
-        <div id="websearch-result" style="margin-top: 1rem;"></div>
-      </section>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
 
-      <!-- Query Section -->
-      <section class="card hidden" id="query-section">
-        <div class="card-header">
-          <span class="card-icon">💬</span>
-          <h2 id="query-section-title">Ask a Question (Contract Document)</h2>
-        </div>
-        <form id="query-form">
-          <input type="text" id="query-input" placeholder="e.g., What is the governing law?" required />
-          <div class="query-options">
-            <label class="toggle-label">
-              <input type="checkbox" id="include-web-search-toggle" />
-              <span>🔍 Also search web for Indian statutes and legal authorities</span>
-            </label>
-          </div>
-          <button type="submit" class="btn btn-primary" id="query-btn">
-            <span class="btn-text">Query Document</span>
-            <span class="spinner hidden" id="query-spinner"></span>
-          </button>
-        </form>
-        <p id="query-status" class="status-msg"></p>
-        <div id="query-result" style="margin-top: 0.75rem;"></div>
-        <div id="doc-websearch-result" style="margin-top: 0.75rem;"></div>
-      </section>
-    </main>
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+    />
 
-    <footer class="footer">
-      <p>Legal RAG Intelligence &middot; Powered by CUAD RoBERTa</p>
-    </footer>
-  </div>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
 
-  <script src="main.js"></script>
-</body>
+    <script type="module" src="/src/main.jsx"></script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+  </body>
 </html>

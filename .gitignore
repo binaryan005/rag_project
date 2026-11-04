@@ -30,3 +30,6 @@ cuad/.venv/
 # macOS
 .DS_Store
 cuad/train_models/
+
+node_modules/
+dist/

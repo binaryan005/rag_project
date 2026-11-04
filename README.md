@@ -30,17 +30,19 @@ Open the `.env` file and add your `GEMINI_API_KEY`. Get one for free at [Google 
 
 ### 3. Start the Backend Server
 ```bash
+cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 4. Start the Frontend
-Open a new terminal window, and run the static frontend:
+Open a new terminal window and run the React app:
 ```bash
 cd frontend
-python3 -m http.server 5500
+npm install
+npm run dev
 ```
 
 ### 5. Access the App
 Open your browser and navigate to: **http://localhost:5500**
 
-You can upload PDF or DOCX contracts, run full CUAD analysis, or ask natural language queries about the document!
+You can upload PDF or DOCX contracts, run full CUAD analysis, or ask natural language queries about the document.

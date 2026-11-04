@@ -87,6 +87,30 @@ class DocumentExtractor:
         return pages
 
     @staticmethod
+    def extract_txt(file_path: str) -> List[PageContent]:
+        """Extracts plain text from .txt files and stores it as a single page."""
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as text_file:
+            text = text_file.read()
+
+        if not text.strip():
+            text = ""
+
+        headings = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped and DocumentExtractor._is_potential_heading(stripped):
+                headings.append(stripped)
+
+        return [
+            PageContent(
+                page_number=1,
+                text=text,
+                word_count=len(text.split()),
+                sections_detected=headings
+            )
+        ]
+
+    @staticmethod
     def extract(file_path: str, file_type: str) -> Tuple[List[PageContent], int]:
         """Unified extraction entrypoint returning list of PageContent and total page count."""
         ext = file_type.lower()
@@ -94,6 +118,8 @@ class DocumentExtractor:
             pages = DocumentExtractor.extract_pdf(file_path)
         elif ext in ["docx", ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]:
             pages = DocumentExtractor.extract_docx(file_path)
+        elif ext in ["txt", ".txt", "text/plain"]:
+            pages = DocumentExtractor.extract_txt(file_path)
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
             

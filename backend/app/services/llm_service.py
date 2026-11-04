@@ -6,7 +6,7 @@ class LLMService:
         self.api_key = settings.GEMINI_API_KEY
         if self.api_key:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-pro')
+            self.model = genai.GenerativeModel('gemini-2.5-flash')
         else:
             self.model = None
 
@@ -17,38 +17,37 @@ class LLMService:
         if not self.model:
             return exact_evidence or "LLM integration is not configured. Please add GEMINI_API_KEY to .env."
 
-        system_prompt = f"""You are a legal contract analysis assistant.
+        evidence_section = f"CONTRACT EVIDENCE (Exact Clause):\n{exact_evidence}" if exact_evidence else "CONTRACT EVIDENCE: No exact clause was extracted by the model."
 
-Answer the user's question using ONLY the provided contract evidence and verified legal references.
+        system_prompt = f"""You are a legal contract intelligence assistant.
+
+Answer the user's question based strictly on the provided contract context.
 
 Rules:
-- Give a direct answer first.
-- Explain the relevant clause in simple language.
-- Mention important conditions, exceptions, fees, penalties, or hidden obligations when relevant.
-- If a legal Act/Section is provided, explain its relevance briefly.
-- Never invent facts, clauses, Acts, or section numbers.
-- Do not call something illegal, fraudulent, or a scam unless the evidence clearly establishes it.
-- If the evidence is insufficient, say so clearly.
-- Do not mention retrieval, embeddings, chunks, JSON, or internal processing.
-- Do not output JSON.
-- Use concise paragraphs and bullet points only when useful.
+- Give a direct, accurate answer first.
+- If the contract does NOT contain terms or provisions related to the question (for example, no payment terms, no indemnification, or no renewal clause), explicitly state that this contract does not contain such provisions. Explain briefly what type of contract this is (e.g. Non-Disclosure Agreement, Software License, etc.).
+- Never invent clauses, terms, numbers, or dates that are not in the contract.
+- If a relevant clause is present, explain its key legal implications in clear, professional language.
+- Do not mention chunks, embeddings, vector search, or internal processing.
+- Keep the response concise, authoritative, and helpful for a legal reviewer.
 
 USER QUESTION:
 {query}
 
-CONTRACT EVIDENCE (Exact Clause):
-{exact_evidence}
+{evidence_section}
 
-ADDITIONAL CONTEXT (Surrounding Text):
+ADDITIONAL CONTEXT (Contract Text):
 {chunks_text}
 """
 
         try:
             response = self.model.generate_content(system_prompt)
-            return response.text
+            return response.text.strip()
         except Exception as e:
             print(f"Error calling Gemini API: {e}")
-            return exact_evidence or "Error generating response from LLM."
+            if exact_evidence:
+                return f"Relevant clause extracted from contract:\n\n\"{exact_evidence}\""
+            return f"No provisions or clauses regarding '{query}' were identified in this document."
 
     def generate_web_legal_answer(self, query: str, grounded_context: str) -> str:
         """
