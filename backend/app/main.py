@@ -5,6 +5,7 @@ from app.config import settings
 from app.database import init_db
 from app.routes.documents import router as documents_router
 from app.routes.analysis import router as analysis_router
+from app.routes.web_search import router as web_search_router
 from app.services.cuad_service import cuad_service
 
 @asynccontextmanager
@@ -35,6 +36,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(documents_router, prefix=settings.API_PREFIX)
 app.include_router(analysis_router, prefix=settings.API_PREFIX)
+app.include_router(web_search_router, prefix=settings.API_PREFIX)
 
 @app.get("/", tags=["Health"])
 def root():

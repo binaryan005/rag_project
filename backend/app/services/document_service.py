@@ -51,13 +51,26 @@ class DocumentService:
         return doc
 
     @staticmethod
-    def process_document(db: Session, document_id: str):
+    def process_document(db_or_id, document_id: Optional[str] = None):
         """Pipeline execution for document processing, chunking, and embedding."""
-        doc = db.query(Document).filter(Document.id == document_id).first()
-        if not doc:
-            return
+        from app.database import SessionLocal
+
+        if isinstance(db_or_id, str):
+            doc_id = db_or_id
+            db = SessionLocal()
+            own_session = True
+        else:
+            doc_id = document_id
+            # When run via FastAPI BackgroundTasks, the request db session is closed by the dependency.
+            # Use a fresh session to ensure background operations succeed reliably.
+            db = SessionLocal()
+            own_session = True
 
         try:
+            doc = db.query(Document).filter(Document.id == doc_id).first()
+            if not doc:
+                return
+
             # 1. Update status to PROCESSING
             doc.status = DocumentStatus.PROCESSING
             db.commit()
@@ -109,12 +122,18 @@ class DocumentService:
             db.commit()
 
         except Exception as e:
-            db.rollback()
-            doc = db.query(Document).filter(Document.id == document_id).first()
-            if doc:
-                doc.status = DocumentStatus.FAILED
-                doc.error_message = str(e)
-                db.commit()
+            try:
+                db.rollback()
+                doc = db.query(Document).filter(Document.id == doc_id).first()
+                if doc:
+                    doc.status = DocumentStatus.FAILED
+                    doc.error_message = str(e)
+                    db.commit()
+            except Exception:
+                pass
+        finally:
+            if own_session:
+                db.close()
 
     @staticmethod
     def get_document(db: Session, document_id: str) -> Optional[Document]:

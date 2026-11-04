@@ -38,6 +38,12 @@ class EmbeddingService:
         """Generates single embedding vector for a text string."""
         return self.generate_embeddings([text])[0]
 
+    @property
+    def is_model_loaded(self) -> bool:
+        """True when the real SentenceTransformer model is in use (not the fallback)."""
+        self._load_model()
+        return self._model is not None
+
     def _fallback_embedding(self, text: str) -> List[float]:
         """Generates a deterministic 384-dimensional vector based on hash of text."""
         import hashlib
